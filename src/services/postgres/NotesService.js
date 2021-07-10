@@ -22,7 +22,7 @@ class NotesService {
 
         const result = await this._pool.query(query)//Untuk mengeksekusi query yang sudah dibuat
 
-        //Mengevaluasi Untuk Memastikan Data Sudah Berhasil Dimasukan Ke Database
+        //Mengevaluasi Menggunakan id Untuk Memastikan Data Sudah Berhasil Dimasukan Ke Database
         if(!result.rows[0].id){
             throw new InvariantError('Catatan gagal ditambahkan')
         }
@@ -76,7 +76,7 @@ class NotesService {
           const result = await this._pool.query(query);
 
           if (!result.rows.length) {
-            throw new NotFoundError('Catatan gagal dihapus. Id tidak ditemukan');
+            throw new NotFoundError('Lagu gagal dihapus. Id tidak ditemukan');
           }
     }
 }

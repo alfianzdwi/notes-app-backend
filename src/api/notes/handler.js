@@ -7,7 +7,8 @@ class NotesHandler {
     constructor(service, validator) {
       this._service = service;
       this._validator = validator;
-   
+    
+      //Bind agar nilai this tidak berubah dari instance NotesHandler, menjadi objek route yang memanggilnya karena sifat this pada javascript this akan berubah menjadi instance yang memanggilnya.
       this.postNoteHandler = this.postNoteHandler.bind(this);
       this.getNotesHandler = this.getNotesHandler.bind(this);
       this.getNoteByIdHandler = this.getNoteByIdHandler.bind(this);
@@ -15,8 +16,7 @@ class NotesHandler {
       this.deleteNoteByIdHandler = this.deleteNoteByIdHandler.bind(this);
     }
 
-    async postNoteHandler(request, h) {
-        
+    async postNoteHandler(request, h) { 
       try{
         this._validator.validateNotePayload(request.payload);
         const {title = 'untitled', body, tags} = request.payload; // Untuk Mendapatkan Nilai Dari Request Yang Dikirim Dari Client
@@ -43,6 +43,7 @@ class NotesHandler {
             return response
         }
 
+        // SERVER ERROR
         const response = h.response({
             status: 'fail',
             message: 'Maaf, terjadi kegagalan pada server kami'

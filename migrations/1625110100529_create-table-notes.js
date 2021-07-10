@@ -1,4 +1,5 @@
 /* eslint-disable camelcase */
+//Berkas Untuk Membua Table,Column,Dll
 
 exports.shorthands = undefined;
 
@@ -12,19 +13,19 @@ exports.up = pgm => {
             type: 'TEXT',
             notNull: true,
           },
-          body: {
+        body: {
             type: 'TEXT',
             notNull: true,
           },
-          tags: {
+        tags: {
             type: 'TEXT[]',
             notNull: true,
           },
-          created_at: {
+        created_at: {
             type: 'TEXT',
             notNull: true,
           },
-          updated_at: {
+        updated_at: {
             type: 'TEXT',
             notNull: true,
           },
