@@ -43,15 +43,19 @@ await server.register([
     },
 ]);
 
+
+// Untuk  memproteksi resource notes untuk memastikan pengguna terautentikasi yang dapat melakukan permintaan dengan melampirkan access token yang valid.
 server.auth.strategy('notesapp_jwt','jwt',{
   keys: process.env.ACCESS_TOKEN_KEY,
-  //Kita diberi nilai false berarti aud/iss/sub tidak akan diverifikasi.
+  // Kita diberi nilai false berarti aud/iss/sub tidak akan diverifikasi.
   verify: {
     aud: false,
     iss: false,
     sub: false,
     maxAgeSec: process.env.ACCESS_TOKEN_AGE,
   },
+
+  //Fungsi ini dapat kita manfaatkan untuk menyimpan payload token yang berarti kredensial pengguna--pada request.auth.
   validate: (artifacts) => ({
     isValid: true,
     credentials: {

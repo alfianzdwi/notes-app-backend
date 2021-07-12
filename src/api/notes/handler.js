@@ -20,8 +20,10 @@ class NotesHandler {
       try{
         this._validator.validateNotePayload(request.payload);
         const {title = 'untitled', body, tags} = request.payload; // Untuk Mendapatkan Nilai Dari Request Yang Dikirim Dari Client
-        
-        const noteId = await this._service.addNote({title, body, tags}); // Untuk proses memasukan catatan baru,Karena fungsi this._service.addNotes akan mengembalikan id catatan yang disimpan, maka buatlah variabel noteId untuk menampung nilainya
+
+            //Destructing Object : dalam JavaScript merupakan sintaksis yang dapat mengeluarkan nilai dari array atau properties dari sebuah object ke dalam satuan yang lebih kecil.
+        const {id: credentialId } = request.auth.credentials; 
+        const noteId = await this._service.addNote({title, body, tags, owner: credentialId}); // Untuk proses memasukan catatan baru,Karena fungsi this._service.addNotes akan mengembalikan id catatan yang disimpan, maka buatlah variabel noteId untuk menampung nilainya
 
         const response = h.response({
             status: 'success',
@@ -55,9 +57,9 @@ class NotesHandler {
     }
 
     
-    async getNotesHandler() {
-        const notes = await this._service.getNotes();
-
+    async getNotesHandler(request) {
+        const {id: credentialId } = request.auth.credentials;  //Karena route /notes menerapkan notesapp_jwt authentication strategy, maka setiap request.auth akan membawa nilai kembalian dari fungsi validate. Dengan begitu, kita bisa mendapatkan user id pengguna yang terautentikasi melalui request.auth.credentials.id.
+        const notes = await this._service.getNotes(credentialId);
         return {
             status: 'success',
             data: {
@@ -69,6 +71,9 @@ class NotesHandler {
     async getNoteByIdHandler(request, h) {
         try{
         const {id} = request.params;
+        const { id: credentialId } = request.auth.credentials;
+    
+        await this._service.verifyNoteOwner(id, credentialId);
         const note = await this._service.getNoteById(id);
 
             return {
@@ -98,12 +103,13 @@ class NotesHandler {
     }
     
     async putNoteByIdHandler(request, h) {
-
         try{
             this._validator.validateNotePayload(request.payload);
 
             const {id} = request.params
-
+            const { id: credentialId } = request.auth.credentials;
+    
+            await this._service.verifyNoteOwner(id, credentialId);
             await this._service.editNoteById(id, request.payload);
 
         
@@ -133,12 +139,15 @@ class NotesHandler {
 
     async deleteNoteByIdHandler(request, h) {
         try {
-          const { id } = request.params;
-          await this._service.deleteNoteById(id);
-          return {
-            status: 'success',
-            message: 'Catatan berhasil dihapus',
-          };
+            const { id } = request.params;
+            const { id: credentialId } = request.auth.credentials;
+    
+            await this._service.verifyNoteOwner(id, credentialId);
+            await this._service.deleteNoteById(id);
+            return {
+                status: 'success',
+                message: 'Catatan berhasil dihapus',
+            };
         } catch (error) {
             if(error instanceof ClientError){
                 const response = h.response({

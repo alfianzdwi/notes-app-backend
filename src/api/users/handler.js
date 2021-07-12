@@ -47,7 +47,7 @@ class UsersHandler {
             return response
         }
     }
-
+ 
     async getUserByIdHandler(request, h){
         try{
             const {id} = request.params;

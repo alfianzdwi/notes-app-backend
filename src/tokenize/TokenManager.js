@@ -1,3 +1,5 @@
+//Berkas Ini Untuk Membuat Dan Memverifikasi Token Menggunakan JWT
+
 const Jwt = require('@hapi/jwt');
 const InvariantError = require('../exceptions/InvariantError');
  
