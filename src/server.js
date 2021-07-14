@@ -1,100 +1,107 @@
+// mengimpor dotenv dan menjalankan konfigurasinya
 require('dotenv').config();
+ 
 const Hapi = require('@hapi/hapi');
 const Jwt = require('@hapi/jwt');
-
-//Notes
+ 
+// notes
 const notes = require('./api/notes');
 const NotesService = require('./services/postgres/NotesService');
 const NotesValidator = require('./validator/notes');
-
-//Users
+ 
+// users
 const users = require('./api/users');
 const UsersService = require('./services/postgres/UsersService');
 const UsersValidator = require('./validator/users');
-
-//Authentications
+ 
+// authentications
 const authentications = require('./api/authentications');
 const AuthenticationsService = require('./services/postgres/AuthenticationsService');
 const TokenManager = require('./tokenize/TokenManager');
 const AuthenticationsValidator = require('./validator/authentications');
+ 
+// collaborations
+const collaborations = require('./api/collaborations');
+const CollaborationsService = require('./services/postgres/CollaborationsService');
+const CollaborationsValidator = require('./validator/collaborations');
 
 const init = async () => {
-    const notesService = new NotesService();
-    const usersService = new UsersService();
-    const authenticationsService = new AuthenticationsService();
-
+  //Membuat Instance Service
+  const collaborationsService = new CollaborationsService();
+  const notesService = new NotesService(collaborationsService);//Karena sekarang NotesService memiliki dependency terhadap CollaborationsService, jadi kita harus memberikan instance CollaborationsService ketika membuat instance NotesService.
+  const usersService = new UsersService();
+  const authenticationsService = new AuthenticationsService();
+ 
   const server = Hapi.server({
     port: process.env.PORT,
     host: process.env.HOST,
-    /** Cross-origin resource sharing (CORS) : Agar Aplikasi Client Bisa Mengakses Origin(alamat server) Yg Berbeda
-         * mekanisme yang dapat membuat mereka saling berinteraksi
-         */
     routes: {
       cors: {
         origin: ['*'],
       },
     },
   });
-
-  // Mendaftarkan PulgIn Eksternal
-await server.register([
+ 
+  // registrasi plugin eksternal
+  await server.register([
     {
       plugin: Jwt,
     },
-]);
-
-
-// Untuk  memproteksi resource notes untuk memastikan pengguna terautentikasi yang dapat melakukan permintaan dengan melampirkan access token yang valid.
-server.auth.strategy('notesapp_jwt','jwt',{
-  keys: process.env.ACCESS_TOKEN_KEY,
-  // Kita diberi nilai false berarti aud/iss/sub tidak akan diverifikasi.
-  verify: {
-    aud: false,
-    iss: false,
-    sub: false,
-    maxAgeSec: process.env.ACCESS_TOKEN_AGE,
-  },
-
-  //Fungsi ini dapat kita manfaatkan untuk menyimpan payload token yang berarti kredensial pengguna--pada request.auth.
-  validate: (artifacts) => ({
-    isValid: true,
-    credentials: {
-      id: artifacts.decoded.payload.id,
+  ]);
+ 
+  // mendefinisikan strategy otentikasi jwt
+  server.auth.strategy('notesapp_jwt', 'jwt', {
+    keys: process.env.ACCESS_TOKEN_KEY,
+    verify: {
+      aud: false,
+      iss: false,
+      sub: false,
+      maxAgeSec: process.env.ACCESS_TOKEN_AGE,
     },
-  })
-});
-
-
-  // Mendaftarkan PlugIn notes dengan options.service bernilai notesService
-await server.register([
-  {
-    plugin: notes,
-    options: {
-      service: notesService,
-      validator: NotesValidator,
+    validate: (artifacts) => ({
+      isValid: true,
+      credentials: {
+        id: artifacts.decoded.payload.id,
+      },
+    }),
+  });
+ 
+  await server.register([
+    {
+      plugin: notes,
+      options: {
+        service: notesService,
+        validator: NotesValidator,
+      },
     },
-  },
-  {
-    plugin: users,
-    options: {
-      service: usersService,
-      validator: UsersValidator,
-    }
-  },
-  {
-    plugin: authentications,
-    options: {
-      authenticationsService,
-      usersService,
-      tokenManager: TokenManager,
-      validator: AuthenticationsValidator,
+    {
+      plugin: users,
+      options: {
+        service: usersService,
+        validator: UsersValidator,
+      },
     },
-  },
-]);
-
-  
+    {
+      plugin: authentications,
+      options: {
+        authenticationsService,
+        usersService,
+        tokenManager: TokenManager,
+        validator: AuthenticationsValidator,
+      },
+    },
+    {
+      plugin: collaborations,
+      options: {
+        collaborationsService,
+        notesService,
+        validator: CollaborationsValidator,
+      },
+    },
+  ]);
+ 
   await server.start();
-  console.log(`Server Berjalan Pada ${server.info.uri}`);
+  console.log(`Server berjalan pada ${server.info.uri}`);
 };
-
+ 
 init();

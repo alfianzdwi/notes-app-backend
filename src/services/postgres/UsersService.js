@@ -87,9 +87,17 @@ class UsersService{
       if (!match) {
         throw new AuthenticationError('Kredensial yang Anda berikan salah');
       }
-
       return id; // Nilai user id tersebut nantinya akan digunakan dalam membuat access token dan refresh token.
+    }
 
+    //Untuk mendapatkan id users berdasarkan query parameter username.
+    async getUsersByUsername(username) {
+      const query = {
+        text: 'SELECT id, username, fullname FROM users WHERE username LIKE $1',//Operator Like  untuk mencari record atau baris pada sebuah tabel, dimana kolom atau field yang dicari sesuai dengan pola (pattern) yang telah ditentukan.
+        values: [`%${username}%`],
+      };
+      const result = await this._pool.query(query);
+      return result.rows;
     }
 }
 

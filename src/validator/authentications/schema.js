@@ -18,3 +18,6 @@ module.exports = {
   PutAuthenticationPayloadSchema,
   DeleteAuthenticationPayloadSchema,
 };
+
+/**Berbeda dengan pembuatan schema lain, pada schema authentications kita akan membuat lebih dari satu schema. 
+ * Karena memang kebutuhan payload tiap routes bisa berbeda. Kita akan membuat schema untuk PostAuthenticationPayloadSchema, PutAuthenticationPayloadSchema, dan DeleteAuthenticationPayloadSchema.  */

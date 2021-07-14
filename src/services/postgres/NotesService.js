@@ -5,9 +5,11 @@ const InvariantError = require('../../exceptions/InVariantError');
 const NotFoundError = require('../../exceptions/NotFoundError');
 const { mapDBToModel } = require('../../utils');
 
+
 class NotesService {
-    constructor(){
+    constructor(collaborationService){
         this._pool = new Pool();
+        this._collaborationService = collaborationService;
     }
 
     async addNote({title,body,tags,owner}){
@@ -31,26 +33,35 @@ class NotesService {
         return result.rows[0].id//Untuk Mengembalikan Id
     }
 
-
+    
     async getNotes(owner){
-        const query = {
-            text: 'SELECT * FROM notes WHERE owner = $1',//Untuk Mengambil Data Dari Database
+
+        //Kueri ini akan mengembalikan seluruh nilai notes yang dimiliki oleh dan dikolaborasikan dengan owner
+        //Data notes yang dihasilkan berpotensi duplikasi, sehingga di akhir kueri, kita GROUP nilainya agar menghilangkan duplikasi yang dilihat berdasarkan notes.id.
+        const query = {                      
+            text: `SELECT notes.* FROM notes 
+            LEFT JOIN collaborations ON collaborations.note_id = notes.id
+            WHERE notes.owner = $1 OR collaborations.user_id = $1
+            GROUP BY notes.id`,
             values: [owner],
         };
 
         const result = await this._pool.query(query);//Melakukan Query Lalu Hasilnya Di Masukkan Ke Dalam Variabel Result 
-
         return result.rows.map(mapDBToModel);//Mengmebalikan Hasil Data Yang Di Dapat Lalu Di mapping,Dengan menggunakan berkas indek yang sudah kita buat di folder utils
     }
 
+    //Untuk Mendapatkan Berdasarkan Id,dan juga mendapatkan username dari hasil Join
     async getNoteById(id){
         const query = {
-            text: 'SELECT * FROM notes WHERE id = $1',
-            values: [id]
+            //Kata FROM = Tabel Sebelah Kiri, Kata JOIN = Tabel Sebelah Kanan
+            text: `SELECT notes.*, users.username
+            FROM notes
+            LEFT JOIN users ON notes.owner = users.id
+            WHERE notes.id = $1`,
+            values: [id],
         }
 
         const result = await this._pool.query(query)
-
         if(!result.rows.length){
             throw new NotFoundError ('Catatan tidak ditemukan');
         }
@@ -105,6 +116,22 @@ class NotesService {
         //Untuk Melakukan pengecekan kesesuaian owner-nya;  bila owner tidak sesuai, maka throw AuthorizationError.
         if(note.owner !== owner){
             throw new AuthorizationError('Anda tidak berhak mengakses resource ini');
+        }
+    }
+
+    //Fungsi yang digunakan dalam menentukan hak akses user baik sebagai owner ataupun kolaborator,Fungsi verifyNoteAccess bertujuan untuk memverifikasi hak akses pengguna (userId) terhadap catatan (id)
+    async verifyNoteAccess(noteId, userId) {
+        try {
+          await this.verifyNoteOwner(noteId, userId);//Fungsi ini akan memeriksa hak akses Bila userId tersebut merupakan owner dari noteId maka ia akan lolos verifikasi. Namun bila gagal, proses verifikasi owner membangkitkan eror (gagal) dan masuk ke block catch.
+        } catch (error) {
+          if (error instanceof NotFoundError) {// Bila error merupakan NotFoundError, maka langsung throw dengan error (NotFoundError) tersebut. Kita tak perlu memeriksa hak akses kolaborator karena catatannya memang tidak ada.
+            throw error;
+        }
+          try {
+            await this._collaborationService.verifyCollaborator(noteId, userId);//Bila AuthorizationError, maka lanjutkan dengan proses pemeriksaan hak akses kolaborator, menggunakan fungsi verifyCollaborator. Bila pengguna seorang kolaborator, proses verifikasi akan lolos.
+          } catch {
+            throw error;
+          }
         }
     }
 }
