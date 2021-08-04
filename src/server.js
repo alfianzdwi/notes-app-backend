@@ -3,6 +3,8 @@ require('dotenv').config();
  
 const Hapi = require('@hapi/hapi');
 const Jwt = require('@hapi/jwt');
+const path = require('path');
+const Inert = require('@hapi/inert')
  
 // notes
 const notes = require('./api/notes');
@@ -25,12 +27,24 @@ const collaborations = require('./api/collaborations');
 const CollaborationsService = require('./services/postgres/CollaborationsService');
 const CollaborationsValidator = require('./validator/collaborations');
 
+// Exports
+const _exports = require('./api/exports');
+const ProducerService = require('./services/rabbitmq/ProducerService');
+const ExportsValidator = require('./validator/exports');
+
+// Uploads
+const uploads = require('./api/uploads');
+const StorageService = require('./services/storage/StorageService');
+const UploadsValidator = require('./validator/uploads');
+
+
 const init = async () => {
   //Membuat Instance Service
   const collaborationsService = new CollaborationsService();
   const notesService = new NotesService(collaborationsService);//Karena sekarang NotesService memiliki dependency terhadap CollaborationsService, jadi kita harus memberikan instance CollaborationsService ketika membuat instance NotesService.
   const usersService = new UsersService();
   const authenticationsService = new AuthenticationsService();
+  const storageService = new StorageService(path.resolve(__dirname, 'api/uploads/file/images'));
  
   const server = Hapi.server({
     port: process.env.PORT,
@@ -45,8 +59,11 @@ const init = async () => {
   // registrasi plugin eksternal
   await server.register([
     {
-      plugin: Jwt,
+      plugin: Jwt, // JSON Web Token (JWT) adalah format token yang banyak digunakan pada Token-Based Authentication.
     },
+    {
+      plugin: Inert, // Inert: Plugin pihak ketiga yang dapat memudahkan kita dalam melayani permintaan menggunakan berkas
+    }
   ]);
  
   // mendefinisikan strategy otentikasi jwt
@@ -98,6 +115,20 @@ const init = async () => {
         validator: CollaborationsValidator,
       },
     },
+    {
+      plugin: _exports,
+      options: {
+        service: ProducerService,
+        validator: ExportsValidator,
+      },
+    },
+    {
+      plugin: uploads,
+      options:{
+        service: storageService,
+        validator: UploadsValidator,
+      }
+    }
   ]);
  
   await server.start();

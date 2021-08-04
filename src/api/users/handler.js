@@ -10,7 +10,7 @@ class UsersHandler {
         this.postUserHandler = this.postUserHandler.bind(this);
         this.getUserByIdHandler = this.getUserByIdHandler.bind(this);
         this.getUsersByUsernameHandler = this.getUsersByUsernameHandler.bind(this);
-    }s
+    }
 
     async postUserHandler(request, h){
         try{

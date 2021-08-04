@@ -73,7 +73,7 @@ class NotesHandler {
         const {id} = request.params;
         const { id: credentialId } = request.auth.credentials;
     
-        await this._service.verifyNoteAccess(id, credentialId);
+        await this._service.verifyNoteAccess(id, credentialId);// Untuk Mengecek User Apakah Sebagai Owner Atau Sebagai Collaborator
         const note = await this._service.getNoteById(id);
 
             return {
