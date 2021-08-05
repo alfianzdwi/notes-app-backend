@@ -7,9 +7,10 @@ const { mapDBToModel } = require('../../utils');
 
 
 class NotesService {
-    constructor(collaborationService){
+    constructor(collaborationService, cacheService){
         this._pool = new Pool();
         this._collaborationService = collaborationService;
+        this._cacheService = cacheService;
     }
 
     async addNote({title,body,tags,owner}){
@@ -29,25 +30,38 @@ class NotesService {
         if(!result.rows[0].id){
             throw new InvariantError('Catatan gagal ditambahkan')
         }
- 
+        
+        await this._cacheService.delete(`notes:${owner}`); // Cache Akan Di Hapus Ketika Terjadi Perubahan Data
         return result.rows[0].id//Untuk Mengembalikan Id
     }
 
     
     async getNotes(owner){
+        try{
+            // Mendapatkan Catatan Dari Cache
+            const result = await this._cacheService.get(`notes:${owner}`)
+            return JSON.parse(result)
 
-        //Kueri ini akan mengembalikan seluruh nilai notes yang dimiliki oleh dan dikolaborasikan dengan owner
-        //Data notes yang dihasilkan berpotensi duplikasi, sehingga di akhir kueri, kita GROUP nilainya agar menghilangkan duplikasi yang dilihat berdasarkan notes.id.
-        const query = {                      
-            text: `SELECT notes.* FROM notes 
-            LEFT JOIN collaborations ON collaborations.note_id = notes.id
-            WHERE notes.owner = $1 OR collaborations.user_id = $1
-            GROUP BY notes.id`,
-            values: [owner],
-        };
+            // bila gagal, diteruskan dengan mendapatkan catatan dari database
+        }catch(error){
+            //Kueri ini akan mengembalikan seluruh nilai notes yang dimiliki oleh dan dikolaborasikan dengan owner
+            //Data notes yang dihasilkan berpotensi duplikasi, sehingga di akhir kueri, kita GROUP nilainya agar menghilangkan duplikasi yang dilihat berdasarkan notes.id.
+            const query = {                      
+                text: `SELECT notes.* FROM notes 
+                LEFT JOIN collaborations ON collaborations.note_id = notes.id
+                WHERE notes.owner = $1 OR collaborations.user_id = $1
+                GROUP BY notes.id`,
+                values: [owner],
+            };
 
-        const result = await this._pool.query(query);//Melakukan Query Lalu Hasilnya Di Masukkan Ke Dalam Variabel Result 
-        return result.rows.map(mapDBToModel);//Mengmebalikan Hasil Data Yang Di Dapat Lalu Di mapping,Dengan menggunakan berkas indek yang sudah kita buat di folder utils
+            const result = await this._pool.query(query);//Melakukan Query Lalu Hasilnya Di Masukkan Ke Dalam Variabel Result 
+            const mappedResult = result.rows.map(mapDBToModel);//Me-Mapping,Dengan menggunakan berkas indek yang sudah kita buat di folder utils
+            
+            // Catatan akan disimpan pada cache sebelum fungsi getNotes dikembalikan
+            await this._cacheService.set(`notes:${owner}`, JSON.stringify(mappedResult)); // Menetapkan nilai key di cache, kita menggunakan userId (owner) dengan prefix notes:`notes:${onwer}`,Dengan begitu, cache akan menyimpan data catatan setiap pengguna secara unik dan terhindar dari tumpang tindih.
+
+            return mappedResult;
+        }
     }
 
     //Untuk Mendapatkan Berdasarkan Id,dan juga mendapatkan username dari hasil Join
@@ -73,7 +87,7 @@ class NotesService {
         const updateAt = new Date().toISOString();
 
         const query = {
-            text: 'UPDATE notes SET title = $1,body = $2,tags = $3, updated_at = $4 WHERE id = $5 RETURNING id',
+            text: 'UPDATE notes SET title = $1,body = $2,tags = $3, updated_at = $4 WHERE id = $5 RETURNING id,owner',
             values: [title, body, tags, updateAt, id]
         }
         
@@ -82,11 +96,14 @@ class NotesService {
         if(!result.rows.length){
             throw new NotFoundError('Gagal memperbarui catatan. Id tidak ditemukan');
         }
+
+        const { owner } = result.rows[0]; // Destructing Object : Mengambil Beberapa/Sebagian Value Yang Ada Di Suatu Object
+        await this._cacheService.delete(`notes:${owner}`);
     }
 
     async deleteNoteById(id){
         const query = {
-            text: 'DELETE FROM notes WHERE id = $1 RETURNING id',
+            text: 'DELETE FROM notes WHERE id = $1 RETURNING id,owner',
             values: [id],
           };
        
@@ -95,6 +112,9 @@ class NotesService {
           if (!result.rows.length) {
             throw new NotFoundError('Lagu gagal dihapus. Id tidak ditemukan');
           }
+
+          const { owner } = result.rows[0];
+          await this._cacheService.delete(`notes:${owner}`);
     }
 
     // Untuk memeriksa apakah catatan dengan id yang diminta adalah hak pengguna. Fungsi tersebut nantinya akan digunakan pada NotesHandler sebelum mendapatkan, mengubah, dan menghapus catatan berdasarkan id.
